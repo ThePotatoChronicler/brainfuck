@@ -133,6 +133,7 @@ int main(int argc, char** argv) {
                                 goto ON_ERROR;
                             }
                             aread = fread(buffer, 1, READAMOUNT, source);
+                            apoint = 0;
                         }
                         EXIT_WHILE:;
                     }
@@ -177,7 +178,6 @@ int main(int argc, char** argv) {
                     retnum = EXIT_FAILURE;
                     goto ON_ERROR;
             }
-
         }
 
         if (aread != READAMOUNT) {

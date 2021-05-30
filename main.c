@@ -107,10 +107,6 @@ int main(int argc, char** argv) {
                     }
                     break;
                 case ']':
-                    // Yes, there are two comments saying
-                    // to fix this part, but it's 3:40 AM
-                    // and I don't have the energy for this.
-
                     // This part is a mess
                     // reading backwards through a file
                     // is a terrible idea, don't do it.
@@ -134,13 +130,6 @@ int main(int argc, char** argv) {
                                 fprintf(stderr, "A matching opening bracket was never found, exiting program!\n");
                                 return EXIT_FAILURE;
                             }
-
-
-                            // This part limits how long a file can be by half,
-                            // because a signed int just ain't as thicc as unsigned int.
-                            // Also, it will probably cause some random bugs with longer
-                            // programs, because of (under/over)flow.
-                            // TODO: Implement this thing properly, this is stupid.
 
                             fseek(source, (signed)-(aread + READAMOUNT), SEEK_CUR);
                             aread = fread(buffer, 1, READAMOUNT, source);

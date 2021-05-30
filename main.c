@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <termios.h>
 #include <stdbool.h>
 
@@ -18,26 +19,45 @@
 //       to be a compile-time constant, but meh,
 //       what do I care.
 
+// Definitions have been moved out of main and put
+// here, so they can be accessed by signal handler(s).
+// TODO: Figure out a better way to do this than
+//       make all the variables global . _.
+FILE* source = NULL;
+char buffer[READAMOUNT];
+struct termios termsave, // Terminal attributes save
+               termtemp; // Temporary termios object to change attributes of
+bool termset = false; // Remembering if terminal state was saved into termsave
+int retnum; // Somewhere to save the return number into
+            // before the program memory is freed and it's lost
+unsigned long long int charat = 0; // Amount of characters gone through.
+                                   // This should not be used as a way
+                                   // to track progress of any kind
+unsigned int bdepth; // Bracket depth, used for brackets (obviously)
+unsigned int aread  = 0, // Amount read
+             apoint = 0; // Point in the read buffer
+unsigned long long int bpoint = 1,   // Brainfuck memory pointer
+                       bsize  = 100; // Brainfuck memory array size
+const long long int bnewsize = 100; // How much to increase memory size by when needed
+unsigned char* bmemory = NULL; // Brainfuck's memory array
+
+
+static void sigint_handle (int sig) {
+    if (source != NULL) {
+        fclose(source);
+    }
+    if (bmemory != NULL) {
+        free(bmemory);
+    }
+    if (termset) {
+        tcsetattr(fileno(stdin), TCSANOW, &termsave);
+    }
+    exit(128 + sig);
+}
+
 int main(int argc, char** argv) {
 
-    FILE* source = NULL;
-    char buffer[READAMOUNT];
-    struct termios termsave, // Terminal attributes save
-                   termtemp; // Temporary termios object to change attributes of
-    bool termset = false; // Remembering if terminal state was saved into termsave
-    int retnum; // Somewhere to save the return number into
-                // before the program memory is freed and it's lost
-    unsigned long long int charat = 0; // Amount of characters gone through.
-                                       // This should not be used as a way
-                                       // to track progress of any kind
-    unsigned int bdepth; // Bracket depth, used for brackets (obviously)
-    unsigned int aread  = 0, // Amount read
-                 apoint = 0; // Point in the read buffer
-    unsigned long long int bpoint = 1,   // Brainfuck memory pointer
-                           bsize  = 100; // Brainfuck memory array size
-    const long long int bnewsize = 100; // How much to increase memory size by when needed
-    unsigned char* bmemory = NULL; // Brainfuck's memory array
-    bmemory = calloc(bsize, 1); // Zero-initialized block of memory
+    signal(SIGINT, sigint_handle);
 
     if (argc < 2) {
         fprintf(stderr, "Atleast one argument is expected >:[\n");
@@ -63,6 +83,7 @@ int main(int argc, char** argv) {
 
     tcsetattr(fileno(stdin), TCSANOW, &termtemp);
 
+    bmemory = calloc(bsize, 1); // Zero-initialized block of memory
     while (true) {
         aread = fread(buffer, 1, READAMOUNT, source);
 

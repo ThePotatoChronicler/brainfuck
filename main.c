@@ -14,13 +14,17 @@
 // to change this
 //
 // TODO: Make this a const variable, since this is dumb
+//       this might not be possible, since it needs
+//       to be a compile-time constant, but meh,
+//       what do I care.
 
 int main(int argc, char** argv) {
 
-    FILE* source;
+    FILE* source = NULL;
     char buffer[READAMOUNT];
     struct termios termsave, // Terminal attributes save
                    termtemp; // Temporary termios object to change attributes of
+    bool termset = false; // Remembering if terminal state was saved into termsave
     int retnum; // Somewhere to save the return number into
                 // before the program memory is freed and it's lost
     unsigned long long int charat = 0; // Amount of characters gone through.
@@ -32,20 +36,23 @@ int main(int argc, char** argv) {
     unsigned long long int bpoint = 1,   // Brainfuck memory pointer
                            bsize  = 100; // Brainfuck memory array size
     const long long int bnewsize = 100; // How much to increase memory size by when needed
-    unsigned char* bmemory; // Brainfuck's memory array
+    unsigned char* bmemory = NULL; // Brainfuck's memory array
     bmemory = calloc(bsize, 1); // Zero-initialized block of memory
 
     if (argc < 2) {
         fprintf(stderr, "Atleast one argument is expected >:[\n");
-        return EXIT_FAILURE;
+        retnum = EXIT_FAILURE;
+        goto ON_ERROR;
     }
     source = fopen(argv[1], "rb");
     if (source == NULL) {
         fprintf(stderr, "An error has occured while opening file, perhaps check the filename\n");
-        return EXIT_FAILURE;
+        retnum = EXIT_FAILURE;
+        goto ON_ERROR;
     }
 
     tcgetattr(fileno(stdin), &termsave); // Saving terminal state so we can recover it later
+    termset = true;
     termtemp = termsave;
     termtemp.c_lflag &= ~(ECHO | ECHONL | ICANON);
     // Disables:
@@ -78,6 +85,8 @@ int main(int argc, char** argv) {
                 case '<':
                     if (bpoint == 0) {
                         fprintf(stderr, "Attempt to go below 0 of the memory array!\n");
+                        retnum = EXIT_FAILURE;
+                        goto ON_ERROR;
                     }
                     --bpoint;
                     break;
@@ -99,7 +108,8 @@ int main(int argc, char** argv) {
 
                             if (aread != READAMOUNT) {
                                 fprintf(stderr, "A matching closing bracket was never found, exiting program!\n");
-                                return EXIT_FAILURE;
+                                retnum = EXIT_FAILURE;
+                                goto ON_ERROR;
                             }
                             aread = fread(buffer, 1, READAMOUNT, source);
                         }
@@ -128,7 +138,8 @@ int main(int argc, char** argv) {
 
                             if (((ftell(source) - aread) == 0)) {
                                 fprintf(stderr, "A matching opening bracket was never found, exiting program!\n");
-                                return EXIT_FAILURE;
+                                retnum = EXIT_FAILURE;
+                                goto ON_ERROR;
                             }
 
                             fseek(source, (signed)-(aread + READAMOUNT), SEEK_CUR);
@@ -142,22 +153,29 @@ int main(int argc, char** argv) {
                     continue;
                 default:
                     fprintf(stderr, "Unknown instruction '%c'(%u) at position %llu\n", buffer[apoint], buffer[apoint], charat + 1);
-                    return EXIT_FAILURE;
+                    retnum = EXIT_FAILURE;
+                    goto ON_ERROR;
             }
 
         }
 
         if (aread != READAMOUNT) {
+            retnum = *bmemory;
             break;
         }
     }
 
-    fclose(source);
-    retnum = *bmemory;
-    free(bmemory);
-
-    tcsetattr(fileno(stdin), TCSANOW, &termsave);
+    ON_ERROR:;
+    if (source != NULL) {
+        fclose(source);
+    }
+    if (bmemory != NULL) {
+        free(bmemory);
+    }
+    if (termset) {
+        tcsetattr(fileno(stdin), TCSANOW, &termsave);
+    }
     // Resets terminal to initial state
 
-    return retnum; // Returns first of the brainfuck array.
+    return retnum; // Returns first of the brainfuck array, or EXIT_FAILURE.
 }

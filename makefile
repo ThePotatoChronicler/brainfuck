@@ -2,6 +2,7 @@
 build: compile_flags.txt
 	gcc main.c -o brainfuck -O2 `cat compile_flags.txt`
 
+.PHONY: debug
 debug: compile_flags.txt
 	gcc main.c -o brainfuck -Og -g -ggdb `cat compile_flags.txt`
 

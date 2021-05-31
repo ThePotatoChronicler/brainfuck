@@ -1,0 +1,59 @@
+#!/usr/bin/env sh
+
+shopt -s extglob
+
+usage() {
+    cat <<EOF
+Bash script to setup files for compilation.
+If you just want to compile the interpreter
+in a way that should work on 99% of the programs
+out there, use the following:
+
+    configure std
+
+This will give you a good enough interpreter.
+If you want to pick more finer details, continue onwards.
+
+    below0: Memory array will allow going below the 0th cell.
+
+    uie | unknown_instruction_error:
+        Exit interpreter when an unknown
+        instruction is met, excluding a newline.
+
+    altinput | alt_input:
+        Input characters will not be echoed, and will
+        be entered character by character.
+
+    return0 | returncell0:
+        The program's return code will be whatever is in
+        the 0th cell of the memory array.
+        When below0 is enabled, behaviour is undefined.
+
+    c[bits] | cell[bits]: Size of one cell of memory in bits.
+
+Notes:
+    This script ignores unknown arguments
+    This script will give you a terminal illness
+EOF
+}
+
+arg_parse () {
+    for ARG in $@; do
+        case $ARG in
+            [Bb]elow0 ) echo -DBF_MEMORY_BELOW_ZERO;;
+            uie | unknown_instruction_error) echo -DBF_ERR_UNK_INST;;
+            c?(ell)16 ) echo -DBF_CELL_SIZE_16;;
+            c?(ell)32 ) echo -DBF_CELL_SIZE_32;;
+            c?(ell)64 ) echo -DBF_CELL_SIZE_64;;
+            alt?(_)input ) echo -DBF_ALT_INPUT;;
+            return?(cell)0 ) echo -DBF_CELL_0_RETURN;;
+            std ) echo $(arg_parse below0);;
+        esac
+    done
+}
+
+if [ $# -gt 0 ]; then
+    arg_parse $@ > compile_flags.txt
+else
+    usage
+fi

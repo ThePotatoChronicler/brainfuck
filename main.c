@@ -6,7 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
-#include <termios.h>
+
+#ifdef BF_ALT_INPUT
+    #include <termios.h>
+#endif
+
 #include <stdbool.h>
 
 #define READAMOUNT 100
@@ -22,25 +26,25 @@
 // Definitions have been moved out of main and put
 // here, so they can be accessed by signal handler(s).
 // TODO: Figure out a better way to do this than
-//       make all the variables global . _.
+//       make part of the variables global . _.
 FILE* source = NULL;
 char buffer[READAMOUNT];
-struct termios termsave, // Terminal attributes save
-               termtemp; // Temporary termios object to change attributes of
-bool termset = false; // Remembering if terminal state was saved into termsave
-int retnum; // Somewhere to save the return number into
-            // before the program memory is freed and it's lost
-unsigned long long int charat = 0; // Amount of characters gone through.
-                                   // This should not be used as a way
-                                   // to track progress of any kind
-unsigned int bdepth; // Bracket depth, used for brackets (obviously)
-unsigned int aread  = 0, // Amount read
-             apoint = 0; // Point in the read buffer
-unsigned long long int bpoint = 1,   // Brainfuck memory pointer
-                       bsize  = 100; // Brainfuck memory array size
-const long long int bnewsize = 100; // How much to increase memory size by when needed
-unsigned char* bmemory = NULL; // Brainfuck's memory array
+#ifdef BF_ALT_INPUT
+    struct termios termsave, // Terminal attributes save
+                   termtemp; // Temporary termios object to change attributes of
+    bool termset = false; // Remembering if terminal state was saved into termsave
+#endif
 
+// Brainfuck's memory array
+#if defined(BF_CELL_SIZE_16)
+    unsigned short int* bmemory = NULL;
+#elif defined(BF_CELL_SIZE_32)
+    unsigned long int* bmemory = NULL;
+#elif defined(BF_CELL_SIZE_64)
+    unsigned long long int* bmemory = NULL;
+#else
+    unsigned char* bmemory = NULL;
+#endif
 
 static void sigint_handle (int sig) {
     if (source != NULL) {
@@ -49,13 +53,29 @@ static void sigint_handle (int sig) {
     if (bmemory != NULL) {
         free(bmemory);
     }
+    #ifdef BF_ALT_INPUT
     if (termset) {
         tcsetattr(fileno(stdin), TCSANOW, &termsave);
     }
+    #endif
     exit(128 + sig);
 }
 
 int main(int argc, char** argv) {
+
+    long int i; // Used for looping
+    int retnum = 0; // Somewhere to save the return number into
+                    // before the program memory is freed and it's lost
+    unsigned long long int charat = 0; // Amount of characters gone through.
+                                       // This should not be used as a way
+                                       // to track progress of any kind
+    unsigned int bdepth; // Bracket depth, used for brackets (obviously)
+    unsigned int aread  = 0, // Amount read
+                 apoint = 0; // Point in the read buffer
+    unsigned long long int bpoint = 1,   // Brainfuck memory pointer
+                           bsize  = 100; // Brainfuck memory array size
+    const long long int bnewsize = 100; // How much to increase memory size by when needed
+    const char bcellsize = sizeof(*bmemory);
 
     signal(SIGINT, sigint_handle);
 
@@ -71,6 +91,7 @@ int main(int argc, char** argv) {
         goto ON_ERROR;
     }
 
+    #ifdef BF_ALT_INPUT
     tcgetattr(fileno(stdin), &termsave); // Saving terminal state so we can recover it later
     termset = true;
     termtemp = termsave;
@@ -82,8 +103,9 @@ int main(int argc, char** argv) {
     // Check termios(3) at your own risk
 
     tcsetattr(fileno(stdin), TCSANOW, &termtemp);
+    #endif
 
-    bmemory = calloc(bsize, 1); // Zero-initialized block of memory
+    bmemory = calloc(bsize, bcellsize); // Zero-initialized block of memory
     while (true) {
         aread = fread(buffer, 1, READAMOUNT, source);
 
@@ -105,9 +127,20 @@ int main(int argc, char** argv) {
                     break;
                 case '<':
                     if (bpoint == 0) {
-                        fprintf(stderr, "Attempt to go below 0 of the memory array!\n");
-                        retnum = EXIT_FAILURE;
-                        goto ON_ERROR;
+                        #ifndef BF_MEMORY_BELOW_ZERO
+                            fprintf(stderr, "Attempt to go below 0 of the memory array!\n");
+                            retnum = EXIT_FAILURE;
+                            goto ON_ERROR;
+                        #else
+                            bmemory = realloc(bmemory, bsize + bnewsize);
+                            for (i = 0; i != bsize; ++i) {
+                                bmemory[i] = bmemory[i + bnewsize];
+                            }
+                            for (i = 0; i != bnewsize; ++i) {
+                                bmemory[i] = 0;
+                            }
+                            bsize += bnewsize;
+                        #endif
                     }
                     --bpoint;
                     break;
@@ -171,17 +204,26 @@ int main(int argc, char** argv) {
                         EXIT_WHILE2:;
                     }
                     break;
+                #ifdef BF_ERR_UNK_INST
                 case '\n':
                     continue;
                 default:
-                    fprintf(stderr, "Unknown instruction '%c'(%u) at position %llu\n", buffer[apoint], buffer[apoint], charat + 1);
+                    if (buffer[apoint] == '\n') {
+                        fprintf(stderr, "Unknown instruction '\n'(10) at position %llu\n", charat + 1);
+                    }
+                    else {
+                        fprintf(stderr, "Unknown instruction '%c'(%u) at position %llu\n", buffer[apoint], buffer[apoint], charat + 1);
+                    }
                     retnum = EXIT_FAILURE;
                     goto ON_ERROR;
+                #endif
             }
         }
 
         if (aread != READAMOUNT) {
-            retnum = *bmemory;
+            #ifdef BF_CELL_0_RETURN
+                retnum = *bmemory;
+            #endif
             break;
         }
     }
@@ -193,10 +235,12 @@ int main(int argc, char** argv) {
     if (bmemory != NULL) {
         free(bmemory);
     }
+    #ifdef BF_ALT_INPUT
     if (termset) {
         tcsetattr(fileno(stdin), TCSANOW, &termsave);
     }
     // Resets terminal to initial state
+    #endif
 
     return retnum; // Returns first of the brainfuck array, or EXIT_FAILURE.
 }

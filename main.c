@@ -20,8 +20,8 @@
 //
 // TODO: Make this a const variable, since this is dumb
 //       this might not be possible, since it needs
-//       to be a compile-time constant, but meh,
-//       what do I care.
+//       to be a compile-time constant. Please remove
+//       this message if what I am asking for is impossible.
 
 // Definitions have been moved out of main and put
 // here, so they can be accessed by signal handler(s).
@@ -54,10 +54,10 @@ static void sigint_handle (int sig) {
         free(bmemory);
     }
     #ifdef BF_ALT_INPUT
-    if (termset) {
-        tcsetattr(fileno(stdin), TCSANOW, &termsave);
-    }
-    #endif
+        if (termset) {
+            tcsetattr(fileno(stdin), TCSANOW, &termsave);
+        }
+        #endif
     exit(128 + sig);
 }
 
@@ -236,10 +236,10 @@ int main(int argc, char** argv) {
         free(bmemory);
     }
     #ifdef BF_ALT_INPUT
-    if (termset) {
-        tcsetattr(fileno(stdin), TCSANOW, &termsave);
-    }
-    // Resets terminal to initial state
+        if (termset) {
+            tcsetattr(fileno(stdin), TCSANOW, &termsave);
+        }
+        // Resets terminal to initial state
     #endif
 
     return retnum; // Returns first of the brainfuck array, or EXIT_FAILURE.

@@ -92,17 +92,17 @@ int main(int argc, char** argv) {
     }
 
     #ifdef BF_ALT_INPUT
-    tcgetattr(fileno(stdin), &termsave); // Saving terminal state so we can recover it later
-    termset = true;
-    termtemp = termsave;
-    termtemp.c_lflag &= ~(ECHO | ECHONL | ICANON);
-    // Disables:
-    // ECHO - No echoing
-    // ECHONL - Do not echo newlines either
-    // ICANON - Don't go line by line, but character by character
-    // Check termios(3) at your own risk
+        tcgetattr(fileno(stdin), &termsave); // Saving terminal state so we can recover it later
+        termset = true;
+        termtemp = termsave;
+        termtemp.c_lflag &= ~(ECHO | ECHONL | ICANON);
+        // Disables:
+        // ECHO - No echoing
+        // ECHONL - Do not echo newlines either
+        // ICANON - Don't go line by line, but character by character
+        // Check termios(3) at your own risk
 
-    tcsetattr(fileno(stdin), TCSANOW, &termtemp);
+        tcsetattr(fileno(stdin), TCSANOW, &termtemp);
     #endif
 
     bmemory = calloc(bsize, bcellsize); // Zero-initialized block of memory
